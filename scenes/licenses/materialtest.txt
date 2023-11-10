@@ -1,0 +1,3 @@
+Materialtest model by the Chalmers Computer Graphics Research Group http://www.cse.chalmers.se/~uffe/ComputerGraphicsGroup.htm
+
+This model is licensed under the CC0 Creative Commons Public Domain https://creativecommons.org/share-your-work/public-domain/cc0/

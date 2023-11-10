@@ -1,0 +1,18 @@
+# Exported by Chalmers Graphics Group
+newmtl personality_sphere
+Kd 1 0.99999 0.99999
+Pm 0.479
+Ks 0.387 0.387 0.387
+Pr 453.448
+Ke 0 0 0
+Tf 0 0 0
+map_Kd wheatley/wheatley.png
+newmtl sphere_light
+Kd 1 0.99999 0.99999
+Pm 0
+Ks 0 0 0
+Pr 0
+Ke 0.5 0.5 0.5
+Tf 0 0 0
+map_Kd wheatley/wheatley_lights.png
+map_Ke wheatley/wheatley_lights.png

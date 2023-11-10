@@ -1,0 +1,7 @@
+# Exported by Chalmers Graphics Group
+newmtl sphere
+Kd 1 0 0
+Pm 0.5
+Ks 0.2 0.2 0.2
+Pr 100
+Ke 0 0 0
