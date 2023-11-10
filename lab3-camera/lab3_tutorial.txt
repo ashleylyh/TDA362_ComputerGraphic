@@ -1,0 +1,8 @@
+Exercise 1: 
+What does the model matrix transform? (strictly speaking)?
+: the car model is rotated/translated 
+Will RT produce the same transformation as TR? Why/Why not?
+: No, as we have learned in any other course in linear algebra, the matrix multiplication A x B is not commutative, hence A x B =/= B x A
+
+Exercise 2: 
+Z-fighting: increase near place / decrease far place

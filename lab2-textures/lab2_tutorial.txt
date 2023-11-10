@@ -1,0 +1,10 @@
+Exercise 1: save place, be more efficient
+
+Exercise 2:
+Field of view: the angle between the 2 horizontal edges of the game's camera projection
+Aspect ratio: width/height
+Near plane: Plane before which nothing will be rendered
+Far plane: Plane after which nothing will be rendered
+
+Exercise 3: 
+ensure the texture binding for the road texture is restored after the GUI change is made

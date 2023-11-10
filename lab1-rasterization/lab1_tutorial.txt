@@ -1,0 +1,17 @@
+Exercise 1: glClear
+
+Task2: 
+glGerBuffers(): Generate buffer ID('name')
+glBingBuffer(): Bind/select currently active glGerBuffers
+glBufferData(): Copy data to currently active buffer
+
+Exercise 3: 2,1
+
+Exercise 4: CAB1234
+
+Exercise 5: by name(both times the vatiable is name color)
+
+Exercise 6: 
+Vertex shader: once each vertex
+Fragment shader: once each pixel
+
