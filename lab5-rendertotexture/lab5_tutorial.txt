@@ -1,0 +1,20 @@
+Exercise1: Mosaic approaches
+Try to explain how these two approaches are equivalent:
+these method rreduce image resolution in a localized manner by creating uniform color blocks. 
+The first method uses explicit resampling while the second method manipulatepicel coordinated to refer to a single color in each block.
+
+Exercise2: Motion Blur
+Another typical and dreaded effect usually implemented in games is motion blur. How would you go about implementing it?
+1 create a velocity buffer to track object motion 
+2 render the scene to a texture 
+3 apply blur to the texture using post-processing shader based on the celocity buffers value 
+4 blend the current blurred frame with previous framess 
+5 rensder the final blurred image to the scene
+
+Exercise3:More complex effects
+In this lab we implement some post-processing effects that take the colors of the rendered scene and use them to produce a modified image.
+This is not sufficient, however, for a lot of common screen-space effects used in the real world. 
+What other information do you think you might need to implement something such as screen-space reflections (SSR)?
+
+Like the depth buffer, normal map, camera information, sprcular map. 
+These layer provided a deeper understanding of the scene geometry and physical properties of its surface, enabling the creation of more sophisticcated and realistic effect. 

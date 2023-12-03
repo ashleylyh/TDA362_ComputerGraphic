@@ -1,0 +1,18 @@
+Exercise1: Depth Testing
+Why do we want to disable depth testing when we render the fullscreen quad?
+
+ensure that the quad is rendered over the entire screen without interference from other geometry
+
+
+Exercise2: Differences among materials
+Purely dielectric materials usually have Fresnel values between 0 and 0.1 (a typical value used is 0.04), although we have used a bit higher values for contrast in our test scene.
+On the other hand, the Fresnel interaction on metal materials is more complex, and in our material model it basically acts as a multiplicand term of the material color for metals, so we have kept the value between 0.5 and 1 in the test scene for it to not get too dark.
+Play a bit with the different material properties to see the different interactions.
+
+Q1: What is the effect of increasing the fresnel value close to 1 on dielectric materials? Test it with and without the glossy reflections from the environment.
+
+A1: Increasing the fresnel value close to 1 will increase reflectivity and reduce visibility of surface details. With glossy reflections, it will enhance environmental reflections, and without them, the reflections will be less detailed and might appear more diffuse.
+
+Q2: What happens when you reduce the metalness of one of the metal materials? How do intermediate values look like, and when could having an intermediate value make sense?
+
+A2: It makes it look less shiny and more colorful, like plastic or painted surfaces. 2. Using values that are not fully metal or non-metal can help make things look like mixed or old materials. 3. This is useful for making objects look more realistic or for special artistic effects in 3D models.

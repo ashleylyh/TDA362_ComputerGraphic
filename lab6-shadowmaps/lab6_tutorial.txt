@@ -1,0 +1,15 @@
+Exercise1: Other types of lights
+Q1: We have created a shadow for a spotlight by using a perspective projection when rendering the shadowmap.
+How would you implement something similar but for the sun, where the rays can be considered to be parallel everywhere accross the scene, instead of converging to a point?
+
+A1: use an orthographic projection when rendering the shadow map. it captures the parellel nature of sunlight, resulting in uniform and directionally consistent shadow.
+
+Q2: How about having a point light with shadows all around?
+
+A2: use a depth cube map from the point light's perspective to render the scene and capture the views in all 6 cardinal direction (up, down, left, right, forward, backward) for the shadown map.
+
+
+Exercise2: hy Percentage Closer Filtering
+Why don't we just compare the reference against the interpolated depth?
+
+comparing fragment depth to interpolated shadownmap depth can create aliasling artifact near shadow edges
