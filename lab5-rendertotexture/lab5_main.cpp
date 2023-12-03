@@ -39,7 +39,7 @@ bool g_isMouseDragging = false;
 // Shader programs
 ///////////////////////////////////////////////////////////////////////////////
 GLuint backgroundProgram, shaderProgram, postFxShader;
-
+GLuint verticalBlurShader = 0, horizontalBlurShader = 0, cutoffShader = 0;
 ///////////////////////////////////////////////////////////////////////////////
 // Environment
 ///////////////////////////////////////////////////////////////////////////////
@@ -89,12 +89,13 @@ enum PostProcessingEffect
 	Mosaic = 6,
 	Separable_blur = 7,
 	Bloom = 8,
+	HueShift = 9
 };
 
 int currentEffect = PostProcessingEffect::None;
 int filterSize = 1;
 int filterSizes[12] = { 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25 };
-
+float hueShift = 0;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Framebuffers
@@ -125,8 +126,10 @@ struct FboInfo
 		glBindTexture(GL_TEXTURE_2D, colorTextureTarget);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
 
 		glGenTextures(1, &depthBuffer);
 		glBindTexture(GL_TEXTURE_2D, depthBuffer);
@@ -141,6 +144,14 @@ struct FboInfo
 		///////////////////////////////////////////////////////////////////////
 		// Task 1
 		//...
+		glGenFramebuffers(1, &framebufferId);
+		glBindFramebuffer(GL_FRAMEBUFFER, framebufferId);
+
+		// bind the texture as color attachment 0 (to the currently bound framebuffer)
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTextureTarget, 0);
+		glDrawBuffer(GL_COLOR_ATTACHMENT0);
+		// bind the texture as depth attachment (to the currently bound framebuffer)
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthBuffer, 0);
 
 		// check if framebuffer is complete
 		isComplete = checkFramebufferComplete();
@@ -214,6 +225,12 @@ void initialize()
 	                                             "../lab5-rendertotexture/shading.frag");
 	postFxShader = labhelper::loadShaderProgram("../lab5-rendertotexture/postFx.vert",
 	                                            "../lab5-rendertotexture/postFx.frag");
+	horizontalBlurShader = labhelper::loadShaderProgram("../lab5-rendertotexture/postFx.vert",
+														"../lab5-rendertotexture/horizontal_blur.frag");
+	verticalBlurShader = labhelper::loadShaderProgram("../lab5-rendertotexture/postFx.vert",
+													"../lab5-rendertotexture/vertical_blur.frag");
+	cutoffShader = labhelper::loadShaderProgram("../lab5-rendertotexture/postFx.vert",
+												"../lab5-rendertotexture/cutoff.frag");
 
 	///////////////////////////////////////////////////////////////////////////
 	// Load environment map
@@ -240,6 +257,10 @@ void initialize()
 	///////////////////////////////////////////////////////////////////////////
 	int w, h;
 	SDL_GetWindowSize(g_window, &w, &h);
+	const int numFbos = 5;
+	for (int i = 0; i < numFbos; i++) {
+		fboList.push_back(FboInfo(w, h));
+	}
 }
 
 
@@ -345,11 +366,24 @@ void display()
 	///////////////////////////////////////////////////////////////////////////
 	// Task 2
 	// ...
+	FboInfo& securityFB = fboList[0];
+	glBindFramebuffer(GL_FRAMEBUFFER, securityFB.framebufferId);
+	glViewport(0, 0, securityFB.width, securityFB.height);
+	glClearColor(0.2, 0.2, 0.8, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	drawScene(securityCamViewMatrix,
+		securityCamProjectionMatrix); // using both shaderProgram and backgroundProgram
+
+	labhelper::Material& screen = landingpadModel->m_materials[8];
+	screen.m_emission_texture.gl_id = securityFB.colorTextureTarget;
 
 	///////////////////////////////////////////////////////////////////////////
 	// draw scene from camera
 	///////////////////////////////////////////////////////////////////////////
-	glBindFramebuffer(GL_FRAMEBUFFER, 0); // to be replaced with another framebuffer when doing post processing
+	// glBindFramebuffer(GL_FRAMEBUFFER, 0); // to be replaced with another framebuffer when doing post processing
+	FboInfo& cameraFB = fboList[1];
+	glBindFramebuffer(GL_FRAMEBUFFER, cameraFB.framebufferId);
 	glViewport(0, 0, w, h);
 	glClearColor(0.2f, 0.2f, 0.8f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -367,6 +401,92 @@ void display()
 	// 2. Set postFxShader as active
 	// 3. Bind the framebuffer to texture unit 0
 	// 4. Draw a quad over the entire viewport
+
+	FboInfo& horizontalBlurFbo = fboList[3];
+	FboInfo& verticalBlurFbo = fboList[4];
+	if (currentEffect == PostProcessingEffect::Separable_blur)
+	{
+		// horizontal blur
+		glBindFramebuffer(GL_FRAMEBUFFER, horizontalBlurFbo.framebufferId);
+		glViewport(0, 0, horizontalBlurFbo.width, horizontalBlurFbo.height);
+		glClear(GL_DEPTH_BUFFER_BIT);
+
+		glUseProgram(horizontalBlurShader);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, cameraFB.colorTextureTarget);
+
+		labhelper::drawFullScreenQuad();
+
+		// vertical blur
+		glBindFramebuffer(GL_FRAMEBUFFER, verticalBlurFbo.framebufferId);
+		glViewport(0, 0, verticalBlurFbo.width, verticalBlurFbo.height);
+		glClear(GL_DEPTH_BUFFER_BIT);
+
+		glUseProgram(verticalBlurShader);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, horizontalBlurFbo.colorTextureTarget);
+
+		labhelper::drawFullScreenQuad();
+	}
+
+	if (currentEffect == PostProcessingEffect::Bloom)
+	{
+		// cutoff shader
+		FboInfo& cutoffFbo = fboList[2];
+		glBindFramebuffer(GL_FRAMEBUFFER, cutoffFbo.framebufferId);
+		glViewport(0, 0, cutoffFbo.width, cutoffFbo.height);
+		glClear(GL_DEPTH_BUFFER_BIT);
+
+		glUseProgram(cutoffShader);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, cameraFB.colorTextureTarget);
+
+		labhelper::drawFullScreenQuad();
+
+		// horizontal blur
+		glBindFramebuffer(GL_FRAMEBUFFER, horizontalBlurFbo.framebufferId);
+		glViewport(0, 0, horizontalBlurFbo.width, horizontalBlurFbo.height);
+		glClear(GL_DEPTH_BUFFER_BIT);
+
+		glUseProgram(horizontalBlurShader);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, cutoffFbo.colorTextureTarget);
+
+		labhelper::drawFullScreenQuad();
+
+		// vertical blur
+		glBindFramebuffer(GL_FRAMEBUFFER, verticalBlurFbo.framebufferId);
+		glViewport(0, 0, verticalBlurFbo.width, verticalBlurFbo.height);
+		glClear(GL_DEPTH_BUFFER_BIT);
+
+		glUseProgram(verticalBlurShader);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, horizontalBlurFbo.colorTextureTarget);
+
+		labhelper::drawFullScreenQuad();
+	}
+
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(0, 0, w, h);
+	glClearColor(0.2f, 0.2f, 0.8f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glUseProgram(postFxShader);
+
+	labhelper::setUniformSlow(postFxShader, "time", currentTime);
+	labhelper::setUniformSlow(postFxShader, "currentEffect", currentEffect);
+	labhelper::setUniformSlow(postFxShader, "filterSize", filterSizes[filterSize - 1]);
+	labhelper::setUniformSlow(postFxShader, "hue_shift", hueShift);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, cameraFB.colorTextureTarget);
+
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, verticalBlurFbo.colorTextureTarget);
+
+
+	labhelper::drawFullScreenQuad();
 
 	// Task 4: Set the required uniforms
 
@@ -497,6 +617,9 @@ void gui()
 	ImGui::RadioButton("Mosaic", &currentEffect, PostProcessingEffect::Mosaic);
 	ImGui::RadioButton("Separable Blur", &currentEffect, PostProcessingEffect::Separable_blur);
 	ImGui::RadioButton("Bloom", &currentEffect, PostProcessingEffect::Bloom);
+	ImGui::RadioButton("Hue Shift", &currentEffect, PostProcessingEffect::HueShift);
+	ImGui::SameLine();
+	ImGui::SliderFloat("Amount##Hue Shift", &hueShift, 0, 1);
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
 	            ImGui::GetIO().Framerate);
 	// ----------------------------------------------------------

@@ -18,7 +18,7 @@ layout(location = 0) out vec4 fragmentColor;
 */
 vec4 textureRect(in sampler2D tex, vec2 rectangleCoord)
 {
-	return texture(tex, rectangleCoord / textureSize(tex, 0));
+	return texture(tex, rectangleCoord / textureSize(tex, 0));x
 }
 
 /**
@@ -47,6 +47,55 @@ vec3 grayscale(vec3 rgbSample);
  */
 vec3 toSepiaTone(vec3 rgbSample);
 
+vec2 mosaic(vec2 inCoord)
+{
+	return inCoord - mod(inCoord, 22.0);
+}
+
+uniform float hue_shift = 0.0;
+vec3 rgb2hsv(vec3 c)
+{
+	float V = max(max(c.r, c.g), c.b);
+	float C = V - min(min(c.r, c.g), c.b);
+	float S = 0;
+	if ( V > 0 )
+	{
+		S = C / V;
+	}
+
+	float H = 0;
+	if (C != 0)
+	{
+		if (c.r == V) H = ((c.g - c.b)/C) / 6.0;
+		else if (c.g == V) H = (2 + (c.b - c.r)/C) / 6.0;
+		else H = (4 + (c.r - c.g)/C) / 6.0;
+		H = fract(H);
+	}
+	return vec3(H, S, V);
+}
+
+vec3 hsv2rgb(vec3 c)
+{
+	float C = c.y * c.z;
+	float X = C * (1 - abs(mod(c.x * 6, 2.0) - 1));
+	float m = c.z - C;
+	if (c.x < 1/6.0) c = vec3(C, X, 0);
+	else if (c.x < 2/6.0) c = vec3(X, C, 0);
+	else if (c.x < 3/6.0) c = vec3(0, C, X);
+	else if (c.x < 4/6.0) c = vec3(0, X, C);
+	else if (c.x < 5/6.0) c = vec3(X, 0, C);
+	else c = vec3(C, 0, X);
+
+	return c + m;
+}
+
+vec3 colorShift(vec3 c)
+{
+	c = rgb2hsv(c);
+	c.x = fract(c.x + hue_shift);
+	return hsv2rgb(c);
+}
+
 
 
 
@@ -74,16 +123,21 @@ void main()
 		fragmentColor = vec4(toSepiaTone(blur(mushrooms(gl_FragCoord.xy))), 1.0);
 		break;
 	case 6:
-		fragmentColor = vec4(0.0); // place holder
+		// fragmentColor = vec4(0.0); // place holder
+		fragmentColor = textureRect(frameBufferTexture, mosaic(gl_FragCoord.xy));
 		break;
 	case 7:
-		fragmentColor = vec4(0.0); // place holder
+		// fragmentColor = vec4(0.0); // place holder
+		fragmentColor = textureRect(blurredFrameBufferTexture, gl_FragCoord.xy);
 		break;
 	case 8:
-		fragmentColor = vec4(0.0); // place holder
+		//fragmentColor = vec4(0.0); // place holder
+		fragmentColor = textureRect(frameBufferTexture, gl_FragCoord.xy)
+		                + textureRect(blurredFrameBufferTexture, gl_FragCoord.xy);
 		break;
 	case 9:
-		fragmentColor = vec4(0.0); // place holder
+		//fragmentColor = vec4(0.0); // place holder
+		fragmentColor = vec4(colorShift(textureRect(frameBufferTexture, gl_FragCoord.xy).rgb), 1);
 		break;
 	}
 }
