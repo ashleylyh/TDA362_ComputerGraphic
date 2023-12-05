@@ -1,4 +1,4 @@
-#version 420
+#version 410
 
 // required by GLSL spec Sect 4.5.3 (though nvidia does not, amd does)
 precision highp float;

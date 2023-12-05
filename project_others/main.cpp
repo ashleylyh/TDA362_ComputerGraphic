@@ -24,8 +24,6 @@ using namespace glm;
 #include "heightfield.h"
 
 
-
-
 using std::min;
 using std::max;
 
@@ -64,14 +62,15 @@ const std::string envmap_base_name = "001";
 vec3 lightPosition;
 vec3 point_light_color = vec3(1.f, 1.f, 1.f);
 
-float point_light_intensity_multiplier = 10000.0f;
+float point_light_intensity_multiplier = 100000.0f;
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // Camera parameters.
 ///////////////////////////////////////////////////////////////////////////////
 vec3 cameraPosition(-70.0f, 50.0f, 70.0f);
 vec3 cameraDirection = normalize(vec3(0.0f) - cameraPosition);
-float cameraSpeed = 10.f;
+float cameraSpeed = 1000.f;
 
 vec3 worldUp(0.0f, 1.0f, 0.0f);
 
@@ -84,7 +83,6 @@ labhelper::Model* landingpadModel = nullptr;
 mat4 roomModelMatrix;
 mat4 landingPadModelMatrix;
 mat4 fighterModelMatrix;
-
 
 float shipSpeed = 50;
 
@@ -99,38 +97,37 @@ float terrainScale = 0.1;
 // "Water shall have fresnel F0 of 0.02 and stone that of 0.035–0.056".
 float terrainShininess = 50.0;
 float terrainFresnel = 0.03;
-
-bool g_showWireframe = true;
+bool g_showWireframe = false;
 bool g_showNormals = false;
-
 
 void loadShaders(bool is_reload)
 {
-	GLuint shader = labhelper::loadShaderProgram("../project/simple.vert", "../project/simple.frag", is_reload);
-	if (shader != 0)
+	GLuint shader = labhelper::loadShaderProgram("../project/simple.vert", "../project/simple.frag",
+	                                             is_reload);
+	if(shader != 0)
 	{
 		simpleShaderProgram = shader;
 	}
 
-	shader = labhelper::loadShaderProgram("../project/fullscreenQuad.vert", "../project/background.frag", is_reload);
-	if (shader != 0)
+	shader = labhelper::loadShaderProgram("../project/fullscreenQuad.vert", "../project/background.frag",
+	                                      is_reload);
+	if(shader != 0)
 	{
 		backgroundProgram = shader;
 	}
 
 	shader = labhelper::loadShaderProgram("../project/shading.vert", "../project/shading.frag", is_reload);
-	if (shader != 0)
+	if(shader != 0)
 	{
 		shaderProgram = shader;
 	}
 
-	shader = labhelper::loadShaderProgram("../project/heightfield.vert", "../project/heightfield.frag", is_reload);
-	if (shader != 0)
+	shader = labhelper::loadShaderProgram("../project/heightfield.vert", "../project/shading.frag", is_reload);
+	if(shader != 0)
 	{
 		heightFieldProgram = shader;
 	}
 }
-
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -154,47 +151,37 @@ void initialize()
 	roomModelMatrix = mat4(1.0f);
 	fighterModelMatrix = translate(15.0f * worldUp);
 	landingPadModelMatrix = mat4(1.0f);
-	terrainModelMatrix = scale(vec3(1000.0f, 125.0f, 1000.0f));
 
 	///////////////////////////////////////////////////////////////////////
 	// Load environment map
 	///////////////////////////////////////////////////////////////////////
 	const int roughnesses = 8;
 	std::vector<std::string> filenames;
-	for (int i = 0; i < roughnesses; i++)
+	for(int i = 0; i < roughnesses; i++)
 		filenames.push_back("../scenes/envmaps/" + envmap_base_name + "_dl_" + std::to_string(i) + ".hdr");
 
 	environmentMap = labhelper::loadHdrTexture("../scenes/envmaps/" + envmap_base_name + ".hdr");
 	irradianceMap = labhelper::loadHdrTexture("../scenes/envmaps/" + envmap_base_name + "_irradiance.hdr");
 	reflectionMap = labhelper::loadHdrMipmapTexture(filenames);
 
-	///////////////////////////////////////////////////////////////////////
-	// Setup Framebuffer for shadow map rendering
-	///////////////////////////////////////////////////////////////////////
-
-	//shadowMapFB.resize(shadowMapResolution, shadowMapResolution);
-
-
-	glEnable(GL_DEPTH_TEST);	// enable Z-buffering 
-	glEnable(GL_CULL_FACE);		// enables backface culling
-
-	//glBindTexture(GL_TEXTURE_2D, shadowMapFB.depthBuffer);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-
-
-	terrain.loadHeightField("../scenes/nlsFinland/L3123F.png");
 	terrain.loadDiffuseTexture("../scenes/nlsFinland/L3123F_downscaled.jpg");
+	terrain.loadHeightField("../scenes/nlsFinland/L3123F.png");
+	terrain.loadShininess("../scenes/nlsFinland/L3123F_shininess.png");
+	terrain.generateMesh(terrainResolution);
+	terrainModelMatrix = translate(-10.0f * worldUp) * scale(vec3(5000));
 
-	terrain.generateMesh(1024);
-
+	glEnable(GL_DEPTH_TEST); // enable Z-buffering
+	glEnable(GL_CULL_FACE);  // enables backface culling
 }
 
-void debugDrawLight(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const glm::vec3& worldSpaceLightPos)
+void debugDrawLight(const glm::mat4& viewMatrix,
+                    const glm::mat4& projectionMatrix,
+                    const glm::vec3& worldSpaceLightPos)
 {
 	mat4 modelMatrix = glm::translate(worldSpaceLightPos);
 	glUseProgram(simpleShaderProgram);
-	labhelper::setUniformSlow(simpleShaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * modelMatrix);
+	labhelper::setUniformSlow(simpleShaderProgram, "modelViewProjectionMatrix",
+	                          projectionMatrix * viewMatrix * modelMatrix);
 	labhelper::setUniformSlow(simpleShaderProgram, "material_color", vec3(1, 1, 1));
 	labhelper::debugDrawSphere();
 }
@@ -215,19 +202,22 @@ void drawBackground(const mat4& viewMatrix, const mat4& projectionMatrix)
 /// This function is used to draw the main objects on the scene
 ///////////////////////////////////////////////////////////////////////////////
 void drawScene(GLuint currentShaderProgram,
-	const mat4& viewMatrix,
-	const mat4& projectionMatrix,
-	const mat4& lightViewMatrix,
-	const mat4& lightProjectionMatrix)
+               const mat4& viewMatrix,
+               const mat4& projectionMatrix,
+               const mat4& lightViewMatrix,
+               const mat4& lightProjectionMatrix)
 {
 	glUseProgram(currentShaderProgram);
 	labhelper::setUniformSlow(currentShaderProgram, "showNormals", g_showNormals);
+
 	// Light source
 	vec4 viewSpaceLightPosition = viewMatrix * vec4(lightPosition, 1.0f);
 	labhelper::setUniformSlow(currentShaderProgram, "point_light_color", point_light_color);
-	labhelper::setUniformSlow(currentShaderProgram, "point_light_intensity_multiplier", point_light_intensity_multiplier);
+	labhelper::setUniformSlow(currentShaderProgram, "point_light_intensity_multiplier",
+	                          point_light_intensity_multiplier);
 	labhelper::setUniformSlow(currentShaderProgram, "viewSpaceLightPosition", vec3(viewSpaceLightPosition));
-	labhelper::setUniformSlow(currentShaderProgram, "viewSpaceLightDir", normalize(vec3(viewMatrix * vec4(-lightPosition, 0.0f))));
+	labhelper::setUniformSlow(currentShaderProgram, "viewSpaceLightDir",
+	                          normalize(vec3(viewMatrix * vec4(-lightPosition, 0.0f))));
 
 
 	// Environment
@@ -238,55 +228,56 @@ void drawScene(GLuint currentShaderProgram,
 
 	// landing pad
 	labhelper::setUniformSlow(currentShaderProgram, "modelViewProjectionMatrix",
-		projectionMatrix * viewMatrix * landingPadModelMatrix);
+	                          projectionMatrix * viewMatrix * landingPadModelMatrix);
 	labhelper::setUniformSlow(currentShaderProgram, "modelViewMatrix", viewMatrix * landingPadModelMatrix);
 	labhelper::setUniformSlow(currentShaderProgram, "normalMatrix",
-		inverse(transpose(viewMatrix * landingPadModelMatrix)));
+	                          inverse(transpose(viewMatrix * landingPadModelMatrix)));
 
 	labhelper::render(landingpadModel);
 
 	// Fighter
 	labhelper::setUniformSlow(currentShaderProgram, "modelViewProjectionMatrix",
-		projectionMatrix * viewMatrix * fighterModelMatrix);
+	                          projectionMatrix * viewMatrix * fighterModelMatrix);
 	labhelper::setUniformSlow(currentShaderProgram, "modelViewMatrix", viewMatrix * fighterModelMatrix);
 	labhelper::setUniformSlow(currentShaderProgram, "normalMatrix",
-		inverse(transpose(viewMatrix * fighterModelMatrix)));
+	                          inverse(transpose(viewMatrix * fighterModelMatrix)));
 
 	labhelper::render(fighterModel);
 }
 
-
-
-
-void drawTerrain (const mat4 &viewMatrix, const mat4 &projectionMatrix, const mat4 &lightViewMatrix, const mat4 &lightProjectionMatrix){
-
+void drawTerrain(GLuint program,
+                 const mat4& viewMatrix,
+                 const mat4& projectionMatrix,
+                 const mat4& lightViewMatrix,
+                 const mat4& lightProjectionMatrix)
+{
 	if(g_showWireframe)
 	{
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	}
 
-	glUseProgram(heightFieldProgram);
+	glUseProgram(program);
 
 	// Configuration
-	labhelper::setUniformSlow(heightFieldProgram, "tesselation", terrainResolution);
-	labhelper::setUniformSlow(heightFieldProgram, "scale", terrainScale);
-	labhelper::setUniformSlow(heightFieldProgram, "showNormals", g_showNormals);
+	labhelper::setUniformSlow(program, "tesselation", terrainResolution);
+	labhelper::setUniformSlow(program, "scale", terrainScale);
+	labhelper::setUniformSlow(program, "showNormals", g_showNormals);
 
 	// Material parameters.
 	// Both water and land are dielectrics.
-	labhelper::setUniformSlow(heightFieldProgram, "material_metalness", 0.0f);
-	labhelper::setUniformSlow(heightFieldProgram, "material_fresnel", terrainFresnel);
-	labhelper::setUniformSlow(heightFieldProgram, "material_shininess", terrainShininess);
+	labhelper::setUniformSlow(program, "material_metalness", 0.0f);
+	labhelper::setUniformSlow(program, "material_fresnel", terrainFresnel);
+	labhelper::setUniformSlow(program, "material_shininess", terrainShininess);
 
 	// Fragment shader parameters.
 	vec4 viewSpaceLightPosition = viewMatrix * vec4(lightPosition, 1.0f);
-	labhelper::setUniformSlow(heightFieldProgram, "point_light_color", point_light_color);
-	labhelper::setUniformSlow(heightFieldProgram, "point_light_intensity_multiplier", point_light_intensity_multiplier);
-	labhelper::setUniformSlow(heightFieldProgram, "viewSpaceLightPosition", vec3(viewSpaceLightPosition));
-	labhelper::setUniformSlow(heightFieldProgram, "viewSpaceLightDir",
+	labhelper::setUniformSlow(program, "point_light_color", point_light_color);
+	labhelper::setUniformSlow(program, "point_light_intensity_multiplier", point_light_intensity_multiplier);
+	labhelper::setUniformSlow(program, "viewSpaceLightPosition", vec3(viewSpaceLightPosition));
+	labhelper::setUniformSlow(program, "viewSpaceLightDir",
 	                          normalize(vec3(viewMatrix * vec4(-lightPosition, 0.0f))));
-	labhelper::setUniformSlow(heightFieldProgram, "environment_multiplier", environment_multiplier);
-	labhelper::setUniformSlow(heightFieldProgram, "viewInverse", inverse(viewMatrix));
+	labhelper::setUniformSlow(program, "environment_multiplier", environment_multiplier);
+	labhelper::setUniformSlow(program, "viewInverse", inverse(viewMatrix));
 
 	// Configure textures.
 	glActiveTexture(GL_TEXTURE1);
@@ -303,30 +294,25 @@ void drawTerrain (const mat4 &viewMatrix, const mat4 &projectionMatrix, const ma
 	glBindTexture(GL_TEXTURE_2D, reflectionMap);
 	glActiveTexture(GL_TEXTURE0);
 
-	labhelper::setUniformSlow(heightFieldProgram, "heightField", 1);
-	labhelper::setUniformSlow(heightFieldProgram, "color_texture", 2);
-	labhelper::setUniformSlow(heightFieldProgram, "shininess_texture", 3);
-	labhelper::setUniformSlow(heightFieldProgram, "environmentMap", 6);
-	labhelper::setUniformSlow(heightFieldProgram, "irradianceMap", 7);
-	labhelper::setUniformSlow(heightFieldProgram, "reflectionMap", 8);
+	labhelper::setUniformSlow(program, "heightField", 1);
+	labhelper::setUniformSlow(program, "color_texture", 2);
+	labhelper::setUniformSlow(program, "shininess_texture", 3);
+	labhelper::setUniformSlow(program, "environmentMap", 6);
+	labhelper::setUniformSlow(program, "irradianceMap", 7);
+	labhelper::setUniformSlow(program, "reflectionMap", 8);
 
-	labhelper::setUniformSlow(heightFieldProgram, "has_color_texture", 1);
-	labhelper::setUniformSlow(heightFieldProgram, "has_shininess_texture", 1);
+	labhelper::setUniformSlow(program, "has_color_texture", 1);
+	labhelper::setUniformSlow(program, "has_shininess_texture", 1);
 
 	// Set matrices.
-	labhelper::setUniformSlow(heightFieldProgram, "modelViewProjectionMatrix",
+	labhelper::setUniformSlow(program, "modelViewProjectionMatrix",
 	                          projectionMatrix * viewMatrix * terrainModelMatrix);
-	labhelper::setUniformSlow(heightFieldProgram, "modelViewMatrix", viewMatrix * terrainModelMatrix);
-	labhelper::setUniformSlow(heightFieldProgram, "normalMatrix", inverse(transpose(viewMatrix * terrainModelMatrix)));
+	labhelper::setUniformSlow(program, "modelViewMatrix", viewMatrix * terrainModelMatrix);
+	labhelper::setUniformSlow(program, "normalMatrix", inverse(transpose(viewMatrix * terrainModelMatrix)));
 	terrain.submitTriangles();
 
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	glUseProgram(0);
-
-
 }
-
-
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -340,45 +326,46 @@ void display(void)
 	///////////////////////////////////////////////////////////////////////////
 	{
 		int w, h;
-		SDL_GetWindowSize(g_window, &w, &h);
-		if (w != windowWidth || h != windowHeight)
+		SDL_GL_GetDrawableSize(g_window, &w, &h);
+		if(w != windowWidth || h != windowHeight)
 		{
 			windowWidth = w;
 			windowHeight = h;
 		}
 	}
 
-	//terrain.generateMesh(terrainResolution);
+	///////////////////////////////////////////////////////////////////////////
+	// Re-tesselate the terrain if we changed the resolution.
+	///////////////////////////////////////////////////////////////////////////
+	if(terrain.m_meshResolution != terrainResolution)
+	{
+		terrain.generateMesh(terrainResolution);
+	}
+
 	///////////////////////////////////////////////////////////////////////////
 	// setup matrices
 	///////////////////////////////////////////////////////////////////////////
-	mat4 projMatrix = perspective(radians(45.0f), float(windowWidth) / float(windowHeight), 5.0f, 2000.0f);
+	mat4 projMatrix = perspective(radians(45.0f), float(windowWidth) / float(windowHeight), 5.0f, 20000.0f);
 	mat4 viewMatrix = lookAt(cameraPosition, cameraPosition + cameraDirection, worldUp);
 
-	vec4 lightStartPosition = vec4(40.0f, 40.0f, 0.0f, 1.0f);
-	lightPosition = vec3(rotate(currentTime, worldUp) * lightStartPosition);
+	vec4 lightStartPosition = vec4(2000.0f, 200.0f, 0.0f, 1.0f);
+	lightPosition = vec3(rotate(currentTime / 3, worldUp) * lightStartPosition);
 	mat4 lightViewMatrix = lookAt(lightPosition, vec3(0.0f), worldUp);
 	mat4 lightProjMatrix = perspective(radians(45.0f), 1.0f, 25.0f, 100.0f);
 
 	///////////////////////////////////////////////////////////////////////////
 	// Bind the environment map(s) to unused texture units
 	///////////////////////////////////////////////////////////////////////////
-
 	glUseProgram(shaderProgram);
-
 	glActiveTexture(GL_TEXTURE6);
 	glBindTexture(GL_TEXTURE_2D, environmentMap);
 	glActiveTexture(GL_TEXTURE7);
 	glBindTexture(GL_TEXTURE_2D, irradianceMap);
 	glActiveTexture(GL_TEXTURE8);
 	glBindTexture(GL_TEXTURE_2D, reflectionMap);
-
-
-	labhelper::setUniformSlow(shaderProgram, "reflectionMap", 8);
-	labhelper::setUniformSlow(shaderProgram, "environmentMap", 6);
-	labhelper::setUniformSlow(shaderProgram, "irradianceMap", 7);
-	//glActiveTexture(GL_TEXTURE0);
-
+	labhelper::setUniformSlowIfValid(shaderProgram, "reflectionMap", 8);
+	labhelper::setUniformSlowIfValid(shaderProgram, "environmentMap", 6);
+	labhelper::setUniformSlowIfValid(shaderProgram, "irradianceMap", 7);
 
 
 	///////////////////////////////////////////////////////////////////////////
@@ -390,14 +377,9 @@ void display(void)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	drawBackground(viewMatrix, projMatrix);
-	
-	drawTerrain(viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix);
 	drawScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix);
-	//drawScene(heightFieldProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix);
+	drawTerrain(heightFieldProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix);
 	debugDrawLight(viewMatrix, projMatrix, vec3(lightPosition));
-
-
-
 }
 
 
@@ -412,24 +394,24 @@ bool handleEvents(void)
 	// check events (keyboard among other)
 	SDL_Event event;
 	bool quitEvent = false;
-	while (SDL_PollEvent(&event))
+	while(SDL_PollEvent(&event))
 	{
 		ImGui_ImplSdlGL3_ProcessEvent(&event);
 
-		if (event.type == SDL_QUIT || (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE))
+		if(event.type == SDL_QUIT || (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE))
 		{
 			quitEvent = true;
 		}
-		else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_g)
+		else if(event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_g)
 		{
 			showUI = !showUI;
 		}
-		else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_PRINTSCREEN)
+		else if(event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_PRINTSCREEN)
 		{
 			labhelper::saveScreenshot();
 		}
-		if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT
-			&& (!showUI || !io.WantCaptureMouse))
+		if(event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT
+		   && (!showUI || !io.WantCaptureMouse))
 		{
 			g_isMouseDragging = true;
 			int x;
@@ -439,12 +421,12 @@ bool handleEvents(void)
 			g_prevMouseCoords.y = y;
 		}
 
-		if (!(SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT)))
+		if(!(SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT)))
 		{
 			g_isMouseDragging = false;
 		}
 
-		if (event.type == SDL_MOUSEMOTION && g_isMouseDragging && !io.WantCaptureMouse)
+		if(event.type == SDL_MOUSEMOTION && g_isMouseDragging && !io.WantCaptureMouse)
 		{
 			// More info at https://wiki.libsdl.org/SDL_MouseMotionEvent
 			int delta_x = event.motion.x - g_prevMouseCoords.x;
@@ -452,7 +434,7 @@ bool handleEvents(void)
 			float rotationSpeed = 0.4f;
 			mat4 yaw = rotate(rotationSpeed * deltaTime * -delta_x, worldUp);
 			mat4 pitch = rotate(rotationSpeed * deltaTime * -delta_y,
-				normalize(cross(cameraDirection, worldUp)));
+			                    normalize(cross(cameraDirection, worldUp)));
 			cameraDirection = vec3(pitch * yaw * vec4(cameraDirection, 0.0f));
 			g_prevMouseCoords.x = event.motion.x;
 			g_prevMouseCoords.y = event.motion.y;
@@ -463,11 +445,11 @@ bool handleEvents(void)
 	const uint8_t* state = SDL_GetKeyboardState(nullptr);
 
 	static bool was_shift_pressed = state[SDL_SCANCODE_LSHIFT];
-	if (was_shift_pressed && !state[SDL_SCANCODE_LSHIFT])
+	if(was_shift_pressed && !state[SDL_SCANCODE_LSHIFT])
 	{
 		cameraSpeed /= 5;
 	}
-	if (!was_shift_pressed && state[SDL_SCANCODE_LSHIFT])
+	if(!was_shift_pressed && state[SDL_SCANCODE_LSHIFT])
 	{
 		cameraSpeed *= 5;
 	}
@@ -476,27 +458,27 @@ bool handleEvents(void)
 
 	vec3 cameraRight = cross(cameraDirection, worldUp);
 
-	if (state[SDL_SCANCODE_W])
+	if(state[SDL_SCANCODE_W])
 	{
 		cameraPosition += cameraSpeed * deltaTime * cameraDirection;
 	}
-	if (state[SDL_SCANCODE_S])
+	if(state[SDL_SCANCODE_S])
 	{
 		cameraPosition -= cameraSpeed * deltaTime * cameraDirection;
 	}
-	if (state[SDL_SCANCODE_A])
+	if(state[SDL_SCANCODE_A])
 	{
 		cameraPosition -= cameraSpeed * deltaTime * cameraRight;
 	}
-	if (state[SDL_SCANCODE_D])
+	if(state[SDL_SCANCODE_D])
 	{
 		cameraPosition += cameraSpeed * deltaTime * cameraRight;
 	}
-	if (state[SDL_SCANCODE_Q])
+	if(state[SDL_SCANCODE_Q])
 	{
 		cameraPosition -= cameraSpeed * deltaTime * worldUp;
 	}
-	if (state[SDL_SCANCODE_E])
+	if(state[SDL_SCANCODE_E])
 	{
 		cameraPosition += cameraSpeed * deltaTime * worldUp;
 	}
@@ -511,7 +493,7 @@ void gui()
 {
 	// ----------------- Set variables --------------------------
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
-		ImGui::GetIO().Framerate);
+	            ImGui::GetIO().Framerate);
 	ImGui::SliderInt("Tesselation", &terrainResolution, 1, 1500);
 	ImGui::SliderFloat("Terrain scale", &terrainScale, 0.0f, 1.0f);
 	ImGui::SliderFloat("Terrain shininess", &terrainShininess, 0.0f, 100.0f);
@@ -530,7 +512,7 @@ int main(int argc, char* argv[])
 	bool stopRendering = false;
 	auto startTime = std::chrono::system_clock::now();
 
-	while (!stopRendering)
+	while(!stopRendering)
 	{
 		//update currentTime
 		std::chrono::duration<float> timeSinceStart = std::chrono::system_clock::now() - startTime;
@@ -548,7 +530,7 @@ int main(int argc, char* argv[])
 		display();
 
 		// Render overlay GUI.
-		if (showUI)
+		if(showUI)
 		{
 			gui();
 		}
