@@ -5,27 +5,24 @@ class HeightField
 {
 public:
 	int m_meshResolution; // triangles edges per quad side
-
 	GLuint m_texid_hf;
 	GLuint m_texid_diffuse;
 	GLuint m_texid_shininess;
-
 	GLuint m_vao;
 	GLuint m_positionBuffer;
 	GLuint m_uvBuffer;
 	GLuint m_indexBuffer;
 	GLuint m_numIndices;
-
-	std::string m_heightFieldPath;
-	std::string m_diffuseTexturePath;
-	std::string m_shininessTexturePath;
+	//std::string m_heightFieldPath;
+	//std::string m_diffuseTexturePath;
 
 	HeightField(void);
-	/// Load shineiness field
-	//void loadShininessTexture(const std::string& shininessPath);
 
 	/// Load height field
 	void loadHeightField(const std::string& heigtFieldPath);
+
+	/// Load shininess map
+	void loadShininess(const std::string& shininessPath);
 
 	/// Load diffuse map
 	void loadDiffuseTexture(const std::string& diffusePath);

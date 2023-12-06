@@ -4,7 +4,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 layout(location = 0) in vec3 position;
 layout(location = 2) in vec2 texCoordIn;
-layout(binding = 0) uniform sampler2D hf;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Input uniform variables
@@ -13,8 +12,10 @@ layout(binding = 0) uniform sampler2D hf;
 uniform mat4 normalMatrix;
 uniform mat4 modelViewMatrix;
 uniform mat4 modelViewProjectionMatrix;
-uniform mat4 lightMatrix;
-uniform float displaceNormal;
+
+uniform sampler2D heightField;
+uniform int tesselation;
+uniform float scale;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Output to fragment shader
@@ -22,35 +23,28 @@ uniform float displaceNormal;
 out vec2 texCoord;
 out vec3 viewSpacePosition;
 out vec3 viewSpaceNormal;
-out vec4 shadowMapCoord;
 
-vec2 uvCoords(vec2 xzCoords)
+void main()
 {
-	return (xzCoords + 1) / 2;
-}
+	float height = texture(heightField, texCoordIn).r * scale;
+	vec3 mappedPos = vec3(position.x, height, position.y);
+	
+	// Estimate normal.
+	float delta = 1.0 / tesselation;
+	float du = texture(heightField, texCoordIn + delta*vec2(-1,0)).r
+		     - texture(heightField, texCoordIn + delta*vec2(1,0)).r;
+	float dv = texture(heightField, texCoordIn + delta*vec2(0,-1)).r
+		     - texture(heightField, texCoordIn + delta*vec2(0,1)).r;
+	// Small term to avoid y-only normals that lead to ugly bands of fresnel.
+	float fudge = 0.01;
+	vec3 normalIn = normalize(vec3(
+		fudge + scale * du / (delta * 2),
+		1.0,
+		fudge + scale * dv / (delta * 2)));
 
-vec4 normalCalc()
-{
-	float off = 0.01f;
-	float hX = texture2D(hf, uvCoords(position.xz + vec2(off, 0))).r;
-	float hZ = texture2D(hf, uvCoords(position.xz + vec2(0, off))).r;
-	float currentHeight = 3*  texture2D(hf, texCoordIn.xy).r;
-
-	vec3 heightPos = vec3(position.x, currentHeight*10, position.z);
-
-	vec3 slopeX = vec3(position.x + off, hX, position.z) - heightPos/2;
-	vec3 slopeZ = vec3(position.x, hZ, position.z + off) - heightPos/2;
-
-	vec3 normal = cross(normalize(slopeX), normalize(slopeZ));
-	return -normalize(vec4(normal,0));
-}
-
-void main() 
-{
-	viewSpaceNormal = (normalMatrix * normalCalc()).xyz;
-	viewSpacePosition = (modelViewMatrix * vec4(position,1.0f)).xyz;
-	float height = texture2D(hf, texCoordIn.xy).r * 3;
-	gl_Position = modelViewProjectionMatrix * vec4(position.x, height, position.z, 1.0) + normalize(vec4(viewSpaceNormal,0)) * displaceNormal;
+	gl_Position = modelViewProjectionMatrix * vec4(mappedPos, 1.0);
 	texCoord = texCoordIn;
-	shadowMapCoord = lightMatrix * vec4(viewSpacePosition, 1.0f);
+	viewSpaceNormal = (normalMatrix * vec4(normalIn, 0.0)).xyz;
+	viewSpacePosition = (modelViewMatrix * vec4(mappedPos, 1.0)).xyz;
+
 }

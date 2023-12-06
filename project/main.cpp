@@ -100,7 +100,7 @@ float terrainScale = 0.1;
 float terrainShininess = 50.0;
 float terrainFresnel = 0.03;
 
-bool g_showWireframe = true;
+bool g_showWireframe = false;
 bool g_showNormals = false;
 
 
@@ -124,7 +124,7 @@ void loadShaders(bool is_reload)
 		shaderProgram = shader;
 	}
 
-	shader = labhelper::loadShaderProgram("../project/heightfield.vert", "../project/heightfield.frag", is_reload);
+	shader = labhelper::loadShaderProgram("../project/heightfield.vert", "../project/shading.frag", is_reload);
 	if (shader != 0)
 	{
 		heightFieldProgram = shader;
@@ -154,7 +154,8 @@ void initialize()
 	roomModelMatrix = mat4(1.0f);
 	fighterModelMatrix = translate(15.0f * worldUp);
 	landingPadModelMatrix = mat4(1.0f);
-	terrainModelMatrix = scale(vec3(1000.0f, 125.0f, 1000.0f));
+	//terrainModelMatrix = scale(vec3(1000.0f, 125.0f, 1000.0f));
+	terrainModelMatrix = translate(-10.0f * worldUp) * scale(vec3(5000));
 
 	///////////////////////////////////////////////////////////////////////
 	// Load environment map
@@ -174,19 +175,19 @@ void initialize()
 
 	//shadowMapFB.resize(shadowMapResolution, shadowMapResolution);
 
-
-	glEnable(GL_DEPTH_TEST);	// enable Z-buffering 
-	glEnable(GL_CULL_FACE);		// enables backface culling
-
 	//glBindTexture(GL_TEXTURE_2D, shadowMapFB.depthBuffer);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
 
 
 	terrain.loadHeightField("../scenes/nlsFinland/L3123F.png");
 	terrain.loadDiffuseTexture("../scenes/nlsFinland/L3123F_downscaled.jpg");
+	terrain.loadShininess("../scenes/nlsFinland/L3123F_downscaled.jpg");
+	terrain.generateMesh(terrainResolution);
 
-	terrain.generateMesh(1024);
+
+	glEnable(GL_DEPTH_TEST);	// enable Z-buffering 
+	glEnable(GL_CULL_FACE);		// enables backface culling
 
 }
 
@@ -258,9 +259,9 @@ void drawScene(GLuint currentShaderProgram,
 
 
 
-void drawTerrain (const mat4 &viewMatrix, const mat4 &projectionMatrix, const mat4 &lightViewMatrix, const mat4 &lightProjectionMatrix){
+void drawTerrain(const mat4& viewMatrix, const mat4& projectionMatrix, const mat4& lightViewMatrix, const mat4& lightProjectionMatrix) {
 
-	if(g_showWireframe)
+	if (g_showWireframe)
 	{
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	}
@@ -284,7 +285,7 @@ void drawTerrain (const mat4 &viewMatrix, const mat4 &projectionMatrix, const ma
 	labhelper::setUniformSlow(heightFieldProgram, "point_light_intensity_multiplier", point_light_intensity_multiplier);
 	labhelper::setUniformSlow(heightFieldProgram, "viewSpaceLightPosition", vec3(viewSpaceLightPosition));
 	labhelper::setUniformSlow(heightFieldProgram, "viewSpaceLightDir",
-	                          normalize(vec3(viewMatrix * vec4(-lightPosition, 0.0f))));
+		normalize(vec3(viewMatrix * vec4(-lightPosition, 0.0f))));
 	labhelper::setUniformSlow(heightFieldProgram, "environment_multiplier", environment_multiplier);
 	labhelper::setUniformSlow(heightFieldProgram, "viewInverse", inverse(viewMatrix));
 
@@ -304,8 +305,8 @@ void drawTerrain (const mat4 &viewMatrix, const mat4 &projectionMatrix, const ma
 	glActiveTexture(GL_TEXTURE0);
 
 	labhelper::setUniformSlow(heightFieldProgram, "heightField", 1);
-	labhelper::setUniformSlow(heightFieldProgram, "color_texture", 2);
-	labhelper::setUniformSlow(heightFieldProgram, "shininess_texture", 3);
+	labhelper::setUniformSlow(heightFieldProgram, "color_texture", 2); //colorMap //color_texture
+	labhelper::setUniformSlow(heightFieldProgram, "shininess_texture", 3); //shininessMap //shininess_texture
 	labhelper::setUniformSlow(heightFieldProgram, "environmentMap", 6);
 	labhelper::setUniformSlow(heightFieldProgram, "irradianceMap", 7);
 	labhelper::setUniformSlow(heightFieldProgram, "reflectionMap", 8);
@@ -315,7 +316,7 @@ void drawTerrain (const mat4 &viewMatrix, const mat4 &projectionMatrix, const ma
 
 	// Set matrices.
 	labhelper::setUniformSlow(heightFieldProgram, "modelViewProjectionMatrix",
-	                          projectionMatrix * viewMatrix * terrainModelMatrix);
+		projectionMatrix * viewMatrix * terrainModelMatrix);
 	labhelper::setUniformSlow(heightFieldProgram, "modelViewMatrix", viewMatrix * terrainModelMatrix);
 	labhelper::setUniformSlow(heightFieldProgram, "normalMatrix", inverse(transpose(viewMatrix * terrainModelMatrix)));
 	terrain.submitTriangles();
@@ -347,8 +348,14 @@ void display(void)
 			windowHeight = h;
 		}
 	}
+	///////////////////////////////////////////////////////////////////////////
+	// Re-tesselate the terrain if we changed the resolution.
+	///////////////////////////////////////////////////////////////////////////
+	if (terrain.m_meshResolution != terrainResolution)
+	{
+		terrain.generateMesh(terrainResolution);
+	}
 
-	//terrain.generateMesh(terrainResolution);
 	///////////////////////////////////////////////////////////////////////////
 	// setup matrices
 	///////////////////////////////////////////////////////////////////////////
@@ -374,10 +381,9 @@ void display(void)
 	glBindTexture(GL_TEXTURE_2D, reflectionMap);
 
 
-	labhelper::setUniformSlow(shaderProgram, "reflectionMap", 8);
+	labhelper::setUniformSlow(shaderProgram, "reflectionMap", 8); //
 	labhelper::setUniformSlow(shaderProgram, "environmentMap", 6);
 	labhelper::setUniformSlow(shaderProgram, "irradianceMap", 7);
-	//glActiveTexture(GL_TEXTURE0);
 
 
 
@@ -390,10 +396,9 @@ void display(void)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	drawBackground(viewMatrix, projMatrix);
-	
-	drawTerrain(viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix);
 	drawScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix);
-	//drawScene(heightFieldProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix);
+	drawTerrain(viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix);
+
 	debugDrawLight(viewMatrix, projMatrix, vec3(lightPosition));
 
 

@@ -8,21 +8,21 @@
 #include <stb_image.h>
 #include <labhelper.h>
 
-
 using namespace glm;
 using std::string;
 
 HeightField::HeightField(void)
-    : m_meshResolution(0)
-    , m_vao(UINT32_MAX)
-    , m_positionBuffer(UINT32_MAX)
-    , m_uvBuffer(UINT32_MAX)
-    , m_indexBuffer(UINT32_MAX)
-    , m_numIndices(0)
-    , m_texid_hf(UINT32_MAX)
-    , m_texid_diffuse(UINT32_MAX)
-    , m_heightFieldPath("")
-    , m_diffuseTexturePath("")
+	: m_meshResolution(0)
+	, m_vao(UINT32_MAX)
+	, m_positionBuffer(UINT32_MAX)
+	, m_uvBuffer(UINT32_MAX)
+	, m_indexBuffer(UINT32_MAX)
+	, m_numIndices(0)
+	, m_texid_hf(UINT32_MAX)
+	, m_texid_diffuse(UINT32_MAX)
+	, m_texid_shininess(UINT32_MAX)
+	//, m_heightFieldPath("")
+	//, m_diffuseTexturePath("")
 {
 }
 
@@ -31,13 +31,13 @@ void HeightField::loadHeightField(const std::string& heigtFieldPath)
 	int width, height, components;
 	stbi_set_flip_vertically_on_load(true);
 	float* data = stbi_loadf(heigtFieldPath.c_str(), &width, &height, &components, 1);
-	if(data == nullptr)
+	if (data == nullptr)
 	{
 		std::cout << "Failed to load image: " << heigtFieldPath << ".\n";
 		return;
 	}
 
-	if(m_texid_hf == UINT32_MAX)
+	if (m_texid_hf == UINT32_MAX)
 	{
 		glGenTextures(1, &m_texid_hf);
 	}
@@ -48,10 +48,38 @@ void HeightField::loadHeightField(const std::string& heigtFieldPath)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, width, height, 0, GL_RED, GL_FLOAT,
-	             data); // just one component (float)
-
-	m_heightFieldPath = heigtFieldPath;
+		data); // just one component (float)
+//stbi_image_free(data);
+//m_heightFieldPath = heigtFieldPath;
 	std::cout << "Successfully loaded heigh field texture: " << heigtFieldPath << ".\n";
+}
+
+void HeightField::loadShininess(const std::string& path)
+{
+	int width, height, components;
+	stbi_set_flip_vertically_on_load(true);
+	float* data = stbi_loadf(path.c_str(), &width, &height, &components, 1);
+	if (data == nullptr)
+	{
+		std::cout << "Failed to load image: " << path << ".\n";
+		return;
+	}
+
+	if (m_texid_shininess == UINT32_MAX)
+	{
+		glGenTextures(1, &m_texid_shininess);
+	}
+	glBindTexture(GL_TEXTURE_2D, m_texid_shininess);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, width, height, 0, GL_RED, GL_FLOAT,
+		data); // just one component (float)
+	stbi_image_free(data);
+
+	std::cout << "Successfully loaded shininess: " << path << ".\n";
 }
 
 void HeightField::loadDiffuseTexture(const std::string& diffusePath)
@@ -59,13 +87,13 @@ void HeightField::loadDiffuseTexture(const std::string& diffusePath)
 	int width, height, components;
 	stbi_set_flip_vertically_on_load(true);
 	uint8_t* data = stbi_load(diffusePath.c_str(), &width, &height, &components, 3);
-	if(data == nullptr)
+	if (data == nullptr)
 	{
 		std::cout << "Failed to load image: " << diffusePath << ".\n";
 		return;
 	}
 
-	if(m_texid_diffuse == UINT32_MAX)
+	if (m_texid_diffuse == UINT32_MAX)
 	{
 		glGenTextures(1, &m_texid_diffuse);
 	}
@@ -159,16 +187,14 @@ void HeightField::submitTriangles(void)
 		return;
 	}
 
+	if (m_vao == UINT32_MAX)
+	{
+		std::cout << "No vertex array is generated, cannot draw anything.\n";
+		return;
+	}
 	glBindVertexArray(m_vao);
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	glDisable(GL_CULL_FACE);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, m_texid_hf);
-	glActiveTexture(GL_TEXTURE11);
-	glBindTexture(GL_TEXTURE_2D, m_texid_diffuse);
-	//glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, 0);
-	glDrawArrays(GL_TRIANGLES, 0, m_numIndices);
-	//glEnable(GL_CULL_FACE);
-	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indexBuffer);
+	glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);
 	glBindVertexArray(0);
+	CHECK_GL_ERROR();
 }
