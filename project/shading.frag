@@ -94,42 +94,6 @@ vec3 calculateDirectIllumination(vec3 wo, vec3 n, vec3 base_color, float shinine
 	return direct_illum;
 }
 
-
-vec3 calculateDirectIllumiunation(vec3 wo, vec3 n, vec3 base_color)
-{
-	vec3 direct_illum = base_color;
-
-	const float distance_to_light = length(viewSpaceLightPosition - viewSpacePosition);
-	const float falloff_factor = 1.0 / (distance_to_light * distance_to_light);
-	vec3 Li = point_light_intensity_multiplier * point_light_color * falloff_factor;
-	vec3 wi = normalize(viewSpaceLightPosition - viewSpacePosition);
-	if(dot(wi, n) <= 0.0)
-		return vec3(0.0);
-
-	float ndotwi = dot(n, wi);
-	vec3 diffuse_term = (1.0 / PI) * base_color * ndotwi * Li;
-	direct_illum = diffuse_term;
-
-	vec3 wh = normalize(wi + wo);
-	float ndotwh = max(0.0001, dot(n, wh));
-	float ndotwo = max(0.0001, dot(n, wo));
-	float wodotwh = max(0.0001, dot(wo, wh));
-	float D = ((material_shininess + 2) / (2.0 * PI)) * pow(ndotwh, material_shininess);
-	float G = min(1.0, min(2.0 * ndotwh * ndotwo / wodotwh, 2.0 * ndotwh * ndotwi / wodotwh));
-	float F = material_fresnel + (1.0 - material_fresnel) * pow(1.0 - wodotwh, 5.0);
-	float denominator = 4.0 * clamp(ndotwo * ndotwi, 0.0001, 1.0);
-	float brdf = D * F * G / denominator;
-
-	// return brdf * dot(n, wi) * Li; 
-
-
-	vec3 dielectric_term = brdf * ndotwi * Li + (1.0 - F) * diffuse_term;
-	vec3 metal_term = brdf * base_color * ndotwi * Li;
-	vec3 microfacet_term = material_metalness * metal_term + (1.0 - material_metalness) * dielectric_term;
-	direct_illum = microfacet_term;
-
-	return direct_illum;
-}
 vec2 sphereLookup(vec3 dir) {
 	// Stolen from background.frag
 	vec4 pixel_world_pos = viewInverse * vec4(texCoord * 2.0 - 1.0, 1.0, 1.0);
