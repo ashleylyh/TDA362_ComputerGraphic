@@ -187,11 +187,6 @@ void HeightField::submitTriangles(void)
 		return;
 	}
 
-	if (m_vao == UINT32_MAX)
-	{
-		std::cout << "No vertex array is generated, cannot draw anything.\n";
-		return;
-	}
 	glBindVertexArray(m_vao);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indexBuffer);
 	glDrawElements(GL_TRIANGLES, m_numIndices, GL_UNSIGNED_INT, nullptr);
